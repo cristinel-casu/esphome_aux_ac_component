@@ -68,6 +68,9 @@ CONF_INVERTER_POWER_DEPRICATED = "invertor_power"
 CONF_DEFROST_STATE = "defrost_state"
 ICON_DEFROST = "mdi:snowflake-melt"
 
+CONF_MILDEW_STATE = "mildew_state"
+ICON_MILDEW_STATE = "mdi:bacteria"
+
 CONF_DISPLAY_INVERTED = "display_inverted"
 ICON_DISPLAY = "mdi:clock-digital"
 
@@ -102,6 +105,10 @@ Capabilities = aux_ac_ns.namespace("Constants")
 # Display actions
 AirConDisplayOffAction = aux_ac_ns.class_("AirConDisplayOffAction", automation.Action)
 AirConDisplayOnAction = aux_ac_ns.class_("AirConDisplayOnAction", automation.Action)
+
+# Antifungus (mildew) actions
+AirConAntifungusOffAction = aux_ac_ns.class_("AirConAntifungusOffAction", automation.Action)
+AirConAntifungusOnAction = aux_ac_ns.class_("AirConAntifungusOnAction", automation.Action)
 
 # test packet action
 AirConSendTestPacketAction = aux_ac_ns.class_(
@@ -302,6 +309,13 @@ CONFIG_SCHEMA = cv.All(
                     cv.Optional(CONF_INTERNAL, default="true"): cv.boolean,
                 }
             ),
+            cv.Optional(CONF_MILDEW_STATE): binary_sensor.binary_sensor_schema(
+                icon=ICON_MILDEW_STATE,
+            ).extend(
+                {
+                    cv.Optional(CONF_INTERNAL, default="true"): cv.boolean,
+                }
+            ),
             cv.Optional(CONF_PRESET_REPORTER): text_sensor.text_sensor_schema(
                 icon=ICON_PRESET_REPORTER,
             ).extend(
@@ -424,6 +438,11 @@ async def to_code(config):
         sens = await binary_sensor.new_binary_sensor(conf)
         cg.add(var.set_defrost_state(sens))
 
+    if CONF_MILDEW_STATE in config:
+        conf = config[CONF_MILDEW_STATE]
+        sens = await binary_sensor.new_binary_sensor(conf)
+        cg.add(var.set_mildew_state_sensor(sens))
+
     if CONF_INVERTER_POWER in config:
         conf = config[CONF_INVERTER_POWER]
         sens = await sensor.new_sensor(conf)
@@ -504,6 +523,35 @@ async def display_off_to_code(config, action_id, template_arg, args):
     synchronous=True,
 )
 async def display_on_to_code(config, action_id, template_arg, args):
+    paren = await cg.get_variable(config[CONF_ID])
+    return cg.new_Pvariable(action_id, template_arg, paren)
+
+
+ANTIFUNGUS_ACTION_SCHEMA = maybe_simple_id(
+    {
+        cv.Required(CONF_ID): cv.use_id(AirCon),
+    }
+)
+
+
+@automation.register_action(
+    "aux_ac.antifungus_off",
+    AirConAntifungusOffAction,
+    ANTIFUNGUS_ACTION_SCHEMA,
+    synchronous=True,
+)
+async def antifungus_off_to_code(config, action_id, template_arg, args):
+    paren = await cg.get_variable(config[CONF_ID])
+    return cg.new_Pvariable(action_id, template_arg, paren)
+
+
+@automation.register_action(
+    "aux_ac.antifungus_on",
+    AirConAntifungusOnAction,
+    ANTIFUNGUS_ACTION_SCHEMA,
+    synchronous=True,
+)
+async def antifungus_on_to_code(config, action_id, template_arg, args):
     paren = await cg.get_variable(config[CONF_ID])
     return cg.new_Pvariable(action_id, template_arg, paren)
 

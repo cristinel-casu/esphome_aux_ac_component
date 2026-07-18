@@ -237,5 +237,36 @@ namespace esphome
             uint8_t pwr_lim_;
         };
 
+        // **************************************** ANTIFUNGUS (MILDEW) ACTIONS ****************************************
+        template <typename... Ts>
+        class AirConAntifungusOnAction : public Action<Ts...>
+        {
+        public:
+            explicit AirConAntifungusOnAction(AirCon *ac) : ac_(ac) {}
+
+            void play(const Ts &...x) override
+            {
+                this->ac_->antifungusSequence(true);
+            }
+
+        protected:
+            AirCon *ac_;
+        };
+
+        template <typename... Ts>
+        class AirConAntifungusOffAction : public Action<Ts...>
+        {
+        public:
+            explicit AirConAntifungusOffAction(AirCon *ac) : ac_(ac) {}
+
+            void play(const Ts &...x) override
+            {
+                this->ac_->antifungusSequence(false);
+            }
+
+        protected:
+            AirCon *ac_;
+        };
+
     } // namespace aux_ac
 } // namespace esphome

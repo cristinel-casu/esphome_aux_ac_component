@@ -2244,6 +2244,7 @@ namespace esphome
             esphome::sensor::Sensor *sensor_vlouver_state_ = nullptr;
             esphome::binary_sensor::BinarySensor *sensor_display_ = nullptr;
             esphome::binary_sensor::BinarySensor *sensor_defrost_ = nullptr;
+            esphome::binary_sensor::BinarySensor *sensor_mildew_state_ = nullptr;
             esphome::text_sensor::TextSensor *sensor_preset_reporter_ = nullptr;
             esphome::sensor::Sensor *sensor_actual_fan_speed_ = nullptr;
             esphome::sensor::Sensor *sensor_inverter_power_limit_value_ = nullptr;
@@ -2401,6 +2402,7 @@ namespace esphome
             void set_vlouver_state_sensor(sensor::Sensor *vlouver_state_sensor) { sensor_vlouver_state_ = vlouver_state_sensor; }
             void set_defrost_state(binary_sensor::BinarySensor *defrost_state_sensor) { sensor_defrost_ = defrost_state_sensor; }
             void set_display_sensor(binary_sensor::BinarySensor *display_sensor) { sensor_display_ = display_sensor; }
+            void set_mildew_state_sensor(binary_sensor::BinarySensor *mildew_state_sensor) { sensor_mildew_state_ = mildew_state_sensor; }
             void set_inverter_power_sensor(sensor::Sensor *inverter_power_sensor) { sensor_inverter_power_ = inverter_power_sensor; }
             void set_preset_reporter_sensor(text_sensor::TextSensor *preset_reporter_sensor) { sensor_preset_reporter_ = preset_reporter_sensor; }
             void set_actual_fan_speed_sensor(sensor::Sensor *actual_fan_speed_sensor) { sensor_actual_fan_speed_ = actual_fan_speed_sensor; }
@@ -2933,6 +2935,12 @@ namespace esphome
                 {
                     sensor_display_->publish_state((_current_ac_state.display == AC_DISPLAY_ON) ^ this->get_display_inverted());
                 }
+
+                // независимое состояние функции "Антиплесень" (mildew), не зависит от preset/custom_preset
+                if (sensor_mildew_state_ != nullptr)
+                {
+                    sensor_mildew_state_->publish_state(_current_ac_state.mildew == AC_MILDEW_ON);
+                }
             }
 
             // вывод в дебаг текущей конфигурации компонента
@@ -2961,6 +2969,7 @@ namespace esphome
                 LOG_SENSOR("  ", "Compressor Temperature", this->sensor_compressor_temperature_);
                 LOG_BINARY_SENSOR("  ", "Defrost Status", this->sensor_defrost_);
                 LOG_BINARY_SENSOR("  ", "Display", this->sensor_display_);
+                LOG_BINARY_SENSOR("  ", "Mildew State", this->sensor_mildew_state_);
                 LOG_TEXT_SENSOR("  ", "Preset Reporter", this->sensor_preset_reporter_);
                 this->dump_traits_(TAG);
             }
@@ -3732,6 +3741,29 @@ namespace esphome
             bool powerLimitationOffSequence()
             {
                 return powerLimitationOnOffSequence(false);
+            }
+
+            // включает/выключает функцию "Антиплесень" (mildew) напрямую по биту, независимо от preset-механизма.
+            // Без ограничения по питанию: включение может не иметь эффекта при включенном кондиционере
+            // (по наблюдениям с пульта), но выключение должно работать в любом режиме, как и очистка
+            // этого бита через CLIMATE_PRESET_NONE в control().
+            bool antifungusSequence(bool enable)
+            {
+                if (!get_has_connection())
+                {
+                    _debugMsg(F("antifungusSequence: no pings from HVAC. It seems like no AC connected."), ESPHOME_LOG_LEVEL_ERROR, __LINE__);
+                    return false;
+                }
+
+                ac_command_t cmd;
+                _clearCommand(&cmd); // не забываем очищать, а то будет мусор
+                cmd.mildew = enable ? AC_MILDEW_ON : AC_MILDEW_OFF;
+                // добавляем команду в последовательность
+                if (!commandSequence(&cmd))
+                    return false;
+
+                _debugMsg(F("antifungusSequence: loaded (mildew = %02X)"), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__, cmd.mildew);
+                return true;
             }
 
             // конвертирует состояние жалюзи из кодов сплита в коды для фронтенда
